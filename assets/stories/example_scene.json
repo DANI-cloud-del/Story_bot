@@ -1,0 +1,12 @@
+{
+    "characters": {
+        "hero": "sprites/hero.png",
+        "villain": "sprites/villain.png"
+    },
+    "background": "backgrounds/castle.png",
+    "dialogue": [
+        {"hero": "I must stop you!"},
+        {"villain": "You'll never win!"},
+        {"hero": "The kingdom depends on it!"}
+    ]
+}
