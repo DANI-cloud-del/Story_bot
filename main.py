@@ -1,11 +1,25 @@
 # story_engine/main.py
+
 import arcade
+import arcade.future.background as background
 from dataclasses import dataclass
 from typing import List, Dict
 
+
+# Constants for the window size and pixel scaling (matches the parallax example)
+PIXEL_SCALE = 3
+ORIGINAL_BG_LAYER_HEIGHT_PX = 240
+SCALED_BG_LAYER_HEIGHT_PX = ORIGINAL_BG_LAYER_HEIGHT_PX * PIXEL_SCALE
+
+WINDOW_WIDTH = 1280
+WINDOW_HEIGHT = 600  # Keep a nice height for character movement
+
+PLAYER_SPEED = 300  # Player speed in pixels per second
+CAMERA_SPEED = 0.1  # Camera lerp speed
+
 @dataclass
 class Scene:
-    background: str
+    background_layers: List[str]  # Paths for parallax layers
     dialogue: List[Dict[str, str]]
     sprites: Dict[str, str]
 
@@ -13,16 +27,12 @@ class Scene:
 class CharacterSprite(arcade.Sprite):
     def __init__(self, idle_path, walk_pattern, scale=0.5):
         super().__init__(idle_path, scale=scale)
-        # Load idle texture
         self.idle_texture = arcade.load_texture(idle_path)
-        # Load walk textures as a list (assuming 8 walk frames: walk0.png ... walk7.png)
-        self.walk_textures = [
-            arcade.load_texture(walk_pattern.format(i)) for i in range(8)
-        ]
+        self.walk_textures = [arcade.load_texture(walk_pattern.format(i)) for i in range(8)]
         self.texture = self.idle_texture
         self._walk_index = 0
         self._walk_timer = 0
-        self.walk_anim_speed = 0.12  # seconds per frame
+        self.walk_anim_speed = 0.12
 
     def update_animation(self, moving, delta_time):
         if moving:
@@ -39,11 +49,16 @@ class CharacterSprite(arcade.Sprite):
 
 class StoryWindow(arcade.Window):
     def __init__(self):
-        super().__init__(800, 600, "Story Engine Demo", resizable=True)
+        super().__init__(WINDOW_WIDTH, WINDOW_HEIGHT, "Story Engine with Parallax Background", resizable=True)
 
-        # Create a simple test scene
+        # Define parallax layer paths (same as in provided parallax example)
         self.scene = Scene(
-            background=":resources:images/backgrounds/abstract_1.jpg",
+            background_layers=[
+                ":resources:/images/miami_synth_parallax/layers/back.png",
+                ":resources:/images/miami_synth_parallax/layers/buildings.png",
+                ":resources:/images/miami_synth_parallax/layers/palms.png",
+                ":resources:/images/miami_synth_parallax/layers/highway.png"
+            ],
             dialogue=[
                 {"hero": "Hello world!"},
                 {"villain": "This is a test!"}
@@ -54,8 +69,24 @@ class StoryWindow(arcade.Window):
             }
         )
 
-        # Setup sprites as animated characters
+        # Set background color to match parallax example
+        self.background_color = (162, 84, 162, 255)
+
+        # Camera for view control
+        self.camera = arcade.Camera2D()
+
+        # Setup parallax backgrounds
+        self.backgrounds = background.ParallaxGroup()
+        bg_layer_size_px = (WINDOW_WIDTH, SCALED_BG_LAYER_HEIGHT_PX)
+        # Depths control how fast layers move relative to player: higher means farther away (slower)
+        depths = [10.0, 5.0, 3.0, 1.0]
+
+        for layer_path, depth in zip(self.scene.background_layers, depths):
+            self.backgrounds.add_from_file(layer_path, size=bg_layer_size_px, depth=depth, scale=PIXEL_SCALE)
+
+        # Setup characters
         self.character_sprites = arcade.SpriteList()
+
         self.hero = CharacterSprite(
             idle_path=self.scene.sprites["hero"],
             walk_pattern=":resources:images/animated_characters/female_adventurer/femaleAdventurer_walk{}.png",
@@ -77,81 +108,86 @@ class StoryWindow(arcade.Window):
         # Movement control flags
         self.hero_movement = {"up": False, "down": False, "left": False, "right": False}
         self.villain_movement = {"up": False, "down": False, "left": False, "right": False}
-        self.movement_speed = 5
+        self.movement_speed = 200  # pixels per second; slower for smoother parallax
 
-    def setup_scene(self):
-        # Set background to a solid color; see below for custom background images
-        arcade.set_background_color(arcade.color.AMAZON)
+    def pan_camera_to_player(self):
+        """Move the camera smoothly towards the hero's position."""
+        target_x = self.hero.center_x
+        target_y = self.height // 2
+        self.camera.position = arcade.math.lerp_2d(self.camera.position, (target_x, target_y), CAMERA_SPEED)
 
     def on_draw(self):
         self.clear()
-        # Optionally draw a background image (comment out if not needed)
-        # arcade.draw_lrwh_rectangle_textured(0, 0, self.width, self.height, arcade.load_texture(self.scene.background))
-        self.character_sprites.draw()
+        with self.camera.activate():
+            # Update parallax background offsets for depth effect
+            self.backgrounds.offset = self.camera.bottom_left
+            self.backgrounds.pos = self.camera.bottom_left
 
-        # Draw dialogue
-        current_text = list(self.scene.dialogue[self.current_line].values())[0]
-        arcade.draw_text(
-            current_text,
-            self.width // 2, 50,
-            arcade.color.WHITE,
-            18,
-            anchor_x="center"
-        )
+            with self.ctx.enabled(self.ctx.BLEND):
+                self.backgrounds.draw()
 
-        # Draw controls hint
-        arcade.draw_text(
-            "WASD: Move Hero | Arrows: Move Villain | SPACE: Next Dialogue",
-            10, 10,
-            arcade.color.WHITE,
-            12
-        )
+            # Draw characters on top
+            self.character_sprites.draw()
+
+            # Draw dialogue (fixed to screen coords)
+            arcade.draw_text(
+                list(self.scene.dialogue[self.current_line].values())[0],
+                self.camera.position[0], 50,
+                arcade.color.WHITE,
+                18,
+                anchor_x="center"
+            )
 
     def on_update(self, delta_time):
-        """ Move sprites and animate based on key presses """
-        # Hero movement (WASD)
-        hero_moving = False
+        # Calculate movement based on pressed keys
+
+        # Hero movement
+        dx = 0
+        dy = 0
         if self.hero_movement["up"]:
-            self.hero.center_y += self.movement_speed
-            hero_moving = True
+            dy += self.movement_speed * delta_time
         if self.hero_movement["down"]:
-            self.hero.center_y -= self.movement_speed
-            hero_moving = True
+            dy -= self.movement_speed * delta_time
         if self.hero_movement["left"]:
-            self.hero.center_x -= self.movement_speed
-            hero_moving = True
+            dx -= self.movement_speed * delta_time
         if self.hero_movement["right"]:
-            self.hero.center_x += self.movement_speed
-            hero_moving = True
+            dx += self.movement_speed * delta_time
 
-        # Villain movement (Arrow keys)
-        villain_moving = False
+        hero_moving = dx != 0 or dy != 0
+        self.hero.center_x += dx
+        self.hero.center_y += dy
+
+        # Villain movement similarly
+        vdx = 0
+        vdy = 0
         if self.villain_movement["up"]:
-            self.villain.center_y += self.movement_speed
-            villain_moving = True
+            vdy += self.movement_speed * delta_time
         if self.villain_movement["down"]:
-            self.villain.center_y -= self.movement_speed
-            villain_moving = True
+            vdy -= self.movement_speed * delta_time
         if self.villain_movement["left"]:
-            self.villain.center_x -= self.movement_speed
-            villain_moving = True
+            vdx -= self.movement_speed * delta_time
         if self.villain_movement["right"]:
-            self.villain.center_x += self.movement_speed
-            villain_moving = True
+            vdx += self.movement_speed * delta_time
 
-        # Animate!
+        villain_moving = vdx != 0 or vdy != 0
+        self.villain.center_x += vdx
+        self.villain.center_y += vdy
+
+        # Animate characters based on movement
         self.hero.update_animation(hero_moving, delta_time)
         self.villain.update_animation(villain_moving, delta_time)
 
-        # Keep sprites on screen
-        for sprite in [self.hero, self.villain]:
-            sprite.center_x = max(sprite.width / 2, min(self.width - sprite.width / 2, sprite.center_x))
+        # Keep sprites inside window bounds
+        for sprite in (self.hero, self.villain):
+            sprite.center_x = max(sprite.width / 2, min(self.camera.position[0] + self.width / 2 - sprite.width / 2, sprite.center_x))
             sprite.center_y = max(sprite.height / 2, min(self.height - sprite.height / 2, sprite.center_y))
+
+        # Pan the camera to the hero
+        self.pan_camera_to_player()
 
     def on_key_press(self, key, modifiers):
         if key == arcade.key.SPACE:
             self.current_line = (self.current_line + 1) % len(self.scene.dialogue)
-        # Hero controls (WASD)
         if key == arcade.key.W:
             self.hero_movement["up"] = True
         elif key == arcade.key.S:
@@ -160,7 +196,6 @@ class StoryWindow(arcade.Window):
             self.hero_movement["left"] = True
         elif key == arcade.key.D:
             self.hero_movement["right"] = True
-        # Villain controls (Arrow keys)
         elif key == arcade.key.UP:
             self.villain_movement["up"] = True
         elif key == arcade.key.DOWN:
@@ -187,6 +222,14 @@ class StoryWindow(arcade.Window):
             self.villain_movement["left"] = False
         elif key == arcade.key.RIGHT:
             self.villain_movement["right"] = False
+
+    def on_resize(self, width, height):
+        super().on_resize(width, height)
+        self.camera.match_window()
+        full_width_size = (width, SCALED_BG_LAYER_HEIGHT_PX)
+        for layer, depth in self.backgrounds:
+            layer.size = full_width_size
+
 
 if __name__ == "__main__":
     window = StoryWindow()
