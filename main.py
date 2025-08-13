@@ -6,6 +6,7 @@ from animation_controller import AnimationController
 from resource_bank import ResourceBank
 import random
 import arcade
+import subprocess  # Added this import
 
 def generate_scene(story, instructions):
     """Create a scene using resources from ResourceBank"""
@@ -20,6 +21,20 @@ def generate_scene(story, instructions):
 
 if __name__ == "__main__":
     try:
+        # Check audio dependencies first
+        subprocess.run(["ffplay", "-h"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError:
+        print("Error: ffplay not found. Please install ffmpeg package.")
+        input("Press Enter to exit...")
+        exit(1)
+
+    # Check if music files exist
+    if hasattr(ResourceBank, 'MUSIC'):
+        for track, path in ResourceBank.MUSIC.items():
+            if not arcade.resources.resolve(path):
+                print(f"Warning: Music track '{track}' not found at {path}")
+
+    try:  # Main execution block starts here
         # Generate dynamic story and matching animations
         story, instructions, music_instructions = get_groq_story()
         

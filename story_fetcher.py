@@ -4,6 +4,7 @@ import json
 import random
 from dotenv import load_dotenv
 from groq import Groq
+from resource_bank import ResourceBank
 
 def get_groq_story(prompt: str = None, max_tokens: int = 500, temperature: float = 0.7):
     load_dotenv()
@@ -37,6 +38,7 @@ Rules:
 - Use 'hurt' during fights
 - Each instruction should last 1-3 seconds
 - Music tracks should match the scene mood"""
+    
     client = Groq(api_key=api_key)
     try:
         resp = client.chat.completions.create(
@@ -60,25 +62,28 @@ Rules:
             else:
                 story.append({line["speaker"]: line["text"]})
         
-        # Validate instructions
-        instructions = []
-        valid_tracks = list(ResourceBank.MUSIC.keys())
+        # Process music instructions
+        music_instructions = []
+        valid_tracks = list(ResourceBank.MUSIC.keys()) if hasattr(ResourceBank, 'MUSIC') else []
         for cmd in response.get("music", []):
             action = cmd.get("action", "play").lower()
             if action not in ["play", "stop"]:
                 continue
                 
             track = cmd.get("track")
-            if action == "play" and track not in valid_tracks:
-                track = random.choice(valid_tracks)
-                
+            if action == "play":
+                if track not in valid_tracks and valid_tracks:  # Only choose random if we have valid tracks
+                    track = random.choice(valid_tracks)
+                elif not valid_tracks:
+                    continue  # Skip if no valid tracks available
+                    
             music_instructions.append({
                 "action": action,
                 "track": track if action == "play" else None
             })
         
-        return story, instructions, music_instructions
-
+        # Process animation instructions
+        instructions = []
         valid_actions = ["walk", "idle", "hurt"]
         for cmd in response.get("instructions", []):
             if cmd.get("character") in ["hero", "villain"]:
@@ -104,11 +109,18 @@ Rules:
                 
                 instructions.append(instruction)
         
-        return story, instructions
+        return story, instructions, music_instructions
         
     except Exception as e:
         print(f"API Error: {e}")
-        # Return default story with random music
+        # Return default story with random music if available
+        default_music = []
+        try:
+            if hasattr(ResourceBank, 'MUSIC') and ResourceBank.MUSIC:
+                default_music = [{"action": "play", "track": random.choice(list(ResourceBank.MUSIC.keys()))}]
+        except Exception as e:
+            print(f"Error getting default music: {e}")
+            
         return [
             {"narrator": "The hero stands ready in the mystical forest."},
             {"hero": "I can feel your dark presence!"},
@@ -116,6 +128,4 @@ Rules:
         ], [
             {"character": "hero", "action": "walk", "direction": "right", "duration": 2},
             {"character": "villain", "action": "walk", "direction": "left", "duration": 2}
-        ], [
-            {"action": "play", "track": "adventure"}
-        ]
+        ], default_music

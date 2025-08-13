@@ -87,22 +87,34 @@ class StoryWindow(arcade.Window):
                 self.stop_music()
 
     def play_music(self, track_name):
-        """Play background music"""
-        self.stop_music()  # Stop any currently playing music
+        """Play background music without interrupting dialogue"""
         try:
+            # First stop any existing music
+            self.stop_music()
+                
+            if not track_name:
+                return
+                    
             music_path = ResourceBank.MUSIC.get(track_name)
             if music_path:
                 self.current_music = arcade.Sound(music_path, streaming=True)
-                self.music_player = self.current_music.play(volume=0.5, loop=True)
+                # Play music at lower volume (0.3) to leave room for dialogue
+                self.music_player = self.current_music.play(volume=0.3, loop=True)
+                if not self.music_player:
+                    print(f"Failed to play music track: {track_name}")
         except Exception as e:
-            print(f"Error playing music: {e}")
-
+            print(f"Error playing music '{track_name}': {e}")
+            
     def stop_music(self):
-        """Stop background music"""
-        if self.current_music and self.music_player:
-            self.current_music.stop(self.music_player)
-        self.current_music = None
-        self.music_player = None
+        """Stop background music immediately"""
+        try:
+            if self.current_music and self.music_player:
+                self.current_music.stop(self.music_player)
+        except Exception as e:
+            print(f"Error stopping music: {e}")
+        finally:
+            self.current_music = None
+            self.music_player = None
 
     def cleanup(self):
         """Clean up resources"""
