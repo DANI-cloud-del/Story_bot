@@ -4,6 +4,7 @@ from settings import *
 from character import CharacterSprite
 from scene import Scene
 from tts_controller import TTSController
+from resource_bank import ResourceBank
 
 class StoryWindow(arcade.Window):
     def __init__(self, scene: Scene):
@@ -67,6 +68,49 @@ class StoryWindow(arcade.Window):
         self.tts = TTSController()
         self.current_speaker = None
         self.current_speech_proc = None
+        self.music_instructions = []
+        self.current_music = None
+        self.music_player = None
+
+    def _handle_music_instructions(self):
+        """Process music instructions from the story"""
+        if not self.music_instructions:
+            return
+            
+        for instruction in self.music_instructions:
+            action = instruction.get("action")
+            track = instruction.get("track")
+            
+            if action == "play":
+                self.play_music(track)
+            elif action == "stop":
+                self.stop_music()
+
+    def play_music(self, track_name):
+        """Play background music"""
+        self.stop_music()  # Stop any currently playing music
+        try:
+            music_path = ResourceBank.MUSIC.get(track_name)
+            if music_path:
+                self.current_music = arcade.Sound(music_path, streaming=True)
+                self.music_player = self.current_music.play(volume=0.5, loop=True)
+        except Exception as e:
+            print(f"Error playing music: {e}")
+
+    def stop_music(self):
+        """Stop background music"""
+        if self.current_music and self.music_player:
+            self.current_music.stop(self.music_player)
+        self.current_music = None
+        self.music_player = None
+
+    def cleanup(self):
+        """Clean up resources"""
+        self.stop_music()
+        if hasattr(self, 'current_speech_proc') and self.current_speech_proc:
+            if self.current_speech_proc.poll() is None:
+                self.current_speech_proc.terminate()
+
 
     def pan_camera_to_player(self):
         target_x = self.hero.center_x
@@ -117,6 +161,7 @@ class StoryWindow(arcade.Window):
         self.pan_camera_to_player()
         self._update_dialogue_fade()
         self._update_animations(delta_time)
+        self._handle_music_instructions()
 
     def _update_animations(self, delta_time):
         if not self.animation_controller or not self.animation_instructions:

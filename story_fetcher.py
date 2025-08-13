@@ -22,19 +22,21 @@ def get_groq_story(prompt: str = None, max_tokens: int = 500, temperature: float
     system_prompt = """You are a storyteller and animation director. Generate:
 1. Dialogue (format: {"speaker": "narrator/hero/villain", "text": "content"})
 2. Animation instructions (format: {"character": "hero/villain", "action": "walk/idle/hurt", "direction": "left/right/up/down", "duration": seconds})
+3. Music instructions (format: {"action": "play/stop", "track": "adventure/scifi"})
 
 Return STRICT JSON format:
 {
     "dialogue": [{"speaker": "narrator", "text": "The forest was quiet..."}],
-    "instructions": [{"character": "hero", "action": "walk", "direction": "right", "duration": 2}]
+    "instructions": [{"character": "hero", "action": "walk", "direction": "right", "duration": 2}],
+    "music": [{"action": "play", "track": "adventure"}]
 }
 
 Rules:
 - Actions must match dialogue
 - Include approach/retreat movements
 - Use 'hurt' during fights
-- Each instruction should last 1-3 seconds"""
-
+- Each instruction should last 1-3 seconds
+- Music tracks should match the scene mood"""
     client = Groq(api_key=api_key)
     try:
         resp = client.chat.completions.create(
@@ -60,6 +62,23 @@ Rules:
         
         # Validate instructions
         instructions = []
+        valid_tracks = list(ResourceBank.MUSIC.keys())
+        for cmd in response.get("music", []):
+            action = cmd.get("action", "play").lower()
+            if action not in ["play", "stop"]:
+                continue
+                
+            track = cmd.get("track")
+            if action == "play" and track not in valid_tracks:
+                track = random.choice(valid_tracks)
+                
+            music_instructions.append({
+                "action": action,
+                "track": track if action == "play" else None
+            })
+        
+        return story, instructions, music_instructions
+
         valid_actions = ["walk", "idle", "hurt"]
         for cmd in response.get("instructions", []):
             if cmd.get("character") in ["hero", "villain"]:
@@ -89,6 +108,7 @@ Rules:
         
     except Exception as e:
         print(f"API Error: {e}")
+        # Return default story with random music
         return [
             {"narrator": "The hero stands ready in the mystical forest."},
             {"hero": "I can feel your dark presence!"},
@@ -96,4 +116,6 @@ Rules:
         ], [
             {"character": "hero", "action": "walk", "direction": "right", "duration": 2},
             {"character": "villain", "action": "walk", "direction": "left", "duration": 2}
+        ], [
+            {"action": "play", "track": "adventure"}
         ]
