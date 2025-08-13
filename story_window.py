@@ -50,6 +50,10 @@ class StoryWindow(arcade.Window):
         self.dialogue_alpha = 0.0
         self.fade_state = "fadein"
         self.dialogue_timer = 0
+        self.animation_controller = None
+        self.animation_instructions = []
+        self.current_instruction_index = 0
+        self.instruction_timer = 0
 
     def pan_camera_to_player(self):
         target_x = self.hero.center_x
@@ -99,6 +103,24 @@ class StoryWindow(arcade.Window):
         self._handle_character_movement(delta_time)
         self.pan_camera_to_player()
         self._update_dialogue_fade()
+        self._update_animations(delta_time)
+
+    def _update_animations(self, delta_time):
+        if not self.animation_controller or not self.animation_instructions:
+            return
+            
+        if self.current_instruction_index >= len(self.animation_instructions):
+            return
+            
+        current_instruction = self.animation_instructions[self.current_instruction_index]
+        self.instruction_timer += delta_time
+        
+        if self.instruction_timer >= current_instruction.get("duration", 2):
+            self.current_instruction_index += 1
+            self.instruction_timer = 0
+            if self.current_instruction_index < len(self.animation_instructions):
+                next_instruction = self.animation_instructions[self.current_instruction_index]
+                self.animation_controller.apply_instructions([next_instruction])
 
     def _handle_character_movement(self, dt):
         # Hero
