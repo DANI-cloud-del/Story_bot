@@ -123,21 +123,65 @@ class StoryWindow(arcade.Window):
                 self.animation_controller.apply_instructions([next_instruction])
 
     def _handle_character_movement(self, dt):
-        # Hero
-        dx = (self.hero_movement["right"] - self.hero_movement["left"]) * self.movement_speed * dt
-        dy = (self.hero_movement["up"] - self.hero_movement["down"]) * self.movement_speed * dt
-        hero_moving = dx != 0 or dy != 0
-        self.hero.center_x += dx
-        self.hero.center_y += dy
-
-        # Villain
-        vdx = (self.villain_movement["right"] - self.villain_movement["left"]) * self.movement_speed * dt
-        vdy = (self.villain_movement["up"] - self.villain_movement["down"]) * self.movement_speed * dt
-        villain_moving = vdx != 0 or vdy != 0
-        self.villain.center_x += vdx
-        self.villain.center_y += vdy
-
-        # Animate
+        """Handle both automatic and manual movement"""
+        # Automatic movement from instructions
+        auto_dx = 0
+        auto_dy = 0
+        
+        if (self.current_instruction_index < len(self.animation_instructions) and self.animation_controller):
+            current_instruction = self.animation_instructions[self.current_instruction_index]
+            if current_instruction.get("action") == "walk":
+                if current_instruction.get("character") == "hero":
+                    if current_instruction.get("direction") == "left":
+                        auto_dx = -self.movement_speed * dt
+                    elif current_instruction.get("direction") == "right":
+                        auto_dx = self.movement_speed * dt
+                    elif current_instruction.get("direction") == "up":
+                        auto_dy = self.movement_speed * dt
+                    elif current_instruction.get("direction") == "down":
+                        auto_dy = -self.movement_speed * dt
+        
+        # Manual movement (overrides automatic when keys are pressed)
+        manual_dx = (self.hero_movement["right"] - self.hero_movement["left"]) * self.movement_speed * dt
+        manual_dy = (self.hero_movement["up"] - self.hero_movement["down"]) * self.movement_speed * dt
+        
+        # Apply movement - manual takes precedence
+        if manual_dx != 0 or manual_dy != 0:
+            self.hero.center_x += manual_dx
+            self.hero.center_y += manual_dy
+            hero_moving = True
+        else:
+            self.hero.center_x += auto_dx
+            self.hero.center_y += auto_dy
+            hero_moving = (auto_dx != 0 or auto_dy != 0)
+        
+        # Villain movement (same logic)
+        v_auto_dx, v_auto_dy = 0, 0
+        if (self.current_instruction_index < len(self.animation_instructions)) and self.animation_controller:
+            current_instruction = self.animation_instructions[self.current_instruction_index]
+            if current_instruction.get("action") == "walk" and current_instruction.get("character") == "villain":
+                if current_instruction.get("direction") == "left":
+                    v_auto_dx = -self.movement_speed * dt
+                elif current_instruction.get("direction") == "right":
+                    v_auto_dx = self.movement_speed * dt
+                elif current_instruction.get("direction") == "up":
+                    v_auto_dy = self.movement_speed * dt
+                elif current_instruction.get("direction") == "down":
+                    v_auto_dy = -self.movement_speed * dt
+        
+        v_manual_dx = (self.villain_movement["right"] - self.villain_movement["left"]) * self.movement_speed * dt
+        v_manual_dy = (self.villain_movement["up"] - self.villain_movement["down"]) * self.movement_speed * dt
+        
+        if v_manual_dx != 0 or v_manual_dy != 0:
+            self.villain.center_x += v_manual_dx
+            self.villain.center_y += v_manual_dy
+            villain_moving = True
+        else:
+            self.villain.center_x += v_auto_dx
+            self.villain.center_y += v_auto_dy
+            villain_moving = (v_auto_dx != 0 or v_auto_dy != 0)
+        
+        # Update animations
         self.hero.update_animation(hero_moving, dt)
         self.villain.update_animation(villain_moving, dt)
 

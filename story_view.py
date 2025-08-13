@@ -180,27 +180,30 @@ class StoryView(arcade.View):
             else:
                 self.villain_movement[direction] = False
 
-    def update_animations_based_on_text(self, text):
-        text = text.lower()
-
-        # Hero animation updates
-        if "hero" in text:
-            if any(k in text for k in ["walk", "move", "run", "forward"]):
-                self.hero.set_state("walk")
-            elif any(k in text for k in ["hurt", "injured", "damage"]):
-                self.hero.set_state("hurt")
-            else:
-                self.hero.set_state("idle")
-        else:
-            self.hero.set_state("idle")
-
-        # Villain animation updates
-        if "villain" in text:
-            if any(k in text for k in ["walk", "move", "run", "forward"]):
-                self.villain.set_state("walk")
-            elif any(k in text for k in ["hurt", "injured", "damage"]):
-                self.villain.set_state("hurt")
-            else:
-                self.villain.set_state("idle")
-        else:
-            self.villain.set_state("idle")
+    def _update_animations(self, delta_time):
+        """Handle automatic animation instructions"""
+        if not self.animation_controller or not self.animation_instructions:
+            return
+            
+        if self.current_instruction_index >= len(self.animation_instructions):
+            # Loop animations when we reach the end
+            self.current_instruction_index = 0
+            self.instruction_timer = 0
+            return
+            
+        current_instruction = self.animation_instructions[self.current_instruction_index]
+        self.instruction_timer += delta_time
+        
+        # Debug print to see what's happening
+        print(f"Executing: {current_instruction} (timer: {self.instruction_timer:.1f}/{current_instruction.get('duration', 2)})")
+        
+        if self.instruction_timer >= current_instruction.get("duration", 2):
+            # Move to next instruction
+            self.current_instruction_index += 1
+            self.instruction_timer = 0
+            
+            # Apply next instruction if available
+            if self.current_instruction_index < len(self.animation_instructions):
+                next_instruction = self.animation_instructions[self.current_instruction_index]
+                self.animation_controller.apply_instructions([next_instruction])
+                print(f"Starting new instruction: {next_instruction}")

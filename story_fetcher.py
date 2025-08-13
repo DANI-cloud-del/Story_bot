@@ -11,32 +11,46 @@ def get_groq_story(prompt: str, max_tokens: int = 500, temperature: float = 0.7)
         raise ValueError("❌ No GROQ_API_KEY in .env file")
 
     system_prompt = """You are a creative storyteller and animation director. Generate:
-1. A story with dialogue (format: [{"narrator": "text"}] or [{"character": "text"}])
-2. Animation instructions (format: {"instructions": [{"character": "hero/villain", "action": "walk/idle/hurt", "duration": seconds}]})
+1. A story with dialogue (format: {"speaker": "narrator/hero/villain", "text": "content"})
+2. Animation instructions (format: {"character": "hero/villain", "action": "walk/idle/hurt", "duration": seconds})
 
-Available actions: idle, walk, hurt
-Available characters: hero, villain
-
-Generate both story and instructions in this JSON format:
+Generate BOTH in this STRICT JSON format:
 {
-    "story": [{"narrator": "text"}],
-    "instructions": [{"character": "hero", "action": "walk", "duration": 2}]
+    "dialogue": [
+        {"speaker": "narrator", "text": "The forest was quiet..."},
+        {"speaker": "hero", "text": "Hello villain!"}
+    ],
+    "instructions": [
+        {"character": "hero", "action": "walk", "duration": 2}
+    ]
 }"""
 
     client = Groq(api_key=api_key)
-    resp = client.chat.completions.create(
-        model="llama3-8b-8192",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=max_tokens,
-        temperature=temperature,
-        response_format={"type": "json_object"}
-    )
-
     try:
+        resp = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature,
+            response_format={"type": "json_object"}
+        )
+
         response = json.loads(resp.choices[0].message.content)
-        return response.get("story", []), response.get("instructions", [])
-    except json.JSONDecodeError:
-        return [{"narrator": "Story generation failed"}], []
+        
+        # Convert to your expected format
+        story = []
+        for line in response.get("dialogue", []):
+            if line["speaker"] == "narrator":
+                story.append({"narrator": line["text"]})
+            else:
+                story.append({line["speaker"]: line["text"]})
+                
+        return story, response.get("instructions", [])
+        
+    except Exception as e:
+        print(f"Error generating story: {e}")
+        # Fallback to simple story
+        return [{"narrator": "Once upon a time in the forest..."}], []

@@ -5,9 +5,27 @@ from story_window import StoryWindow
 from animation_controller import AnimationController
 
 if __name__ == "__main__":
-    story, instructions = get_groq_story(
-        "Write a peaceful fantasy scene in a forest with a hero and a villain, including dialogue."
-    )
+    # For testing, you can uncomment the hardcoded version:
+    story = [
+        {"narrator": "In the heart of the Whispering Woods..."},
+        {"hero": "I've been searching for you, Malakai!"},
+        {"villain": "Ah, Eira. The chosen one. I've been expecting you."},
+        {"narrator": "Eira drew her sword, its blade shimmering with light."}
+    ]
+    instructions = [
+        {"character": "hero", "action": "walk", "direction": "right", "duration": 2},
+        {"character": "villain", "action": "idle", "duration": 1.5},
+        {"character": "hero", "action": "hurt", "duration": 1},
+        {"character": "villain", "action": "walk", "direction": "left", "duration": 1.5}
+    ]
+    
+    # Or use the API version (comment out the above when using this):
+    # story, instructions = get_groq_story(
+    #     "Write a peaceful fantasy scene in a forest with a hero and a villain, including dialogue."
+    # )
+    
+    print("Story:", story)
+    print("Instructions:", instructions)
     
     scene = Scene(
         background_layers=[

@@ -5,9 +5,15 @@ class AnimationController:
         self.villain = villain_sprite
         self.hero_movement = {"up": False, "down": False, "left": False, "right": False}
         self.villain_movement = {"up": False, "down": False, "left": False, "right": False}
-        self.movement_speed = 200
+        self.movement_speed = 300  # Default speed, can be overridden
 
     def apply_instructions(self, instructions):
+        """Process animation instructions"""
+        if not instructions:
+            return
+            
+        print(f"Applying instructions: {instructions}")
+        
         for cmd in instructions:
             char = cmd.get("character")
             action = cmd.get("action")
@@ -19,6 +25,7 @@ class AnimationController:
                 self._handle_action(self.villain, self.villain_movement, action, direction)
 
     def _handle_action(self, sprite, movement_dict, action, direction):
+        """Set sprite state based on action"""
         # Reset all movements first
         for key in movement_dict:
             movement_dict[key] = False
@@ -33,6 +40,7 @@ class AnimationController:
             elif direction == "down":
                 movement_dict["down"] = True
                 
-        # For other actions like idle, hurt, etc.
+        # Set sprite state if available
         if hasattr(sprite, 'set_state'):
             sprite.set_state(action)
+            print(f"Set {sprite} to state: {action}")
