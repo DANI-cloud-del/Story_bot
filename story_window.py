@@ -3,6 +3,7 @@ import arcade.future.background as background
 from settings import *
 from character import CharacterSprite
 from scene import Scene
+from tts_controller import TTSController
 
 class StoryWindow(arcade.Window):
     def __init__(self, scene: Scene):
@@ -63,6 +64,9 @@ class StoryWindow(arcade.Window):
         self.animation_instructions = []
         self.current_instruction_index = 0
         self.instruction_timer = 0
+        self.tts = TTSController()
+        self.current_speaker = None
+        self.current_speech_proc = None
 
     def pan_camera_to_player(self):
         target_x = self.hero.center_x
@@ -243,3 +247,34 @@ class StoryWindow(arcade.Window):
         full_width_size = (width, SCALED_BG_LAYER_HEIGHT_PX)
         for layer, depth in self.backgrounds:
             layer.size = full_width_size
+
+    def speak_dialogue(self, line):
+        """Speak the current line of dialogue"""
+        if self.current_speech_proc and self.current_speech_proc.poll() is None:
+            self.current_speech_proc.terminate()
+        
+        speaker = list(line.keys())[0]
+        text = list(line.values())[0]
+        self.current_speaker = speaker
+        self.tts.speak_line(speaker, text)
+
+    # Modify the _update_dialogue_fade method:
+    def _update_dialogue_fade(self):
+        if self.fade_state == "fadein":
+            self.dialogue_alpha += FADE_IN_SPEED
+            if self.dialogue_alpha >= 1.0:
+                self.fade_state = "display"
+                self.dialogue_alpha = 1.0
+                self.dialogue_timer = 0
+                # Speak the line when fully faded in
+                self.speak_dialogue(self.scene.dialogue[self.current_line])
+        elif self.fade_state == "display":
+            self.dialogue_timer += 1
+            if self.dialogue_timer >= DIALOGUE_DISPLAY_TIME:
+                self.fade_state = "fadeout"
+        elif self.fade_state == "fadeout":
+            self.dialogue_alpha -= FADE_OUT_SPEED
+            if self.dialogue_alpha <= 0:
+                self.fade_state = "fadein"
+                self.dialogue_alpha = 0
+                self.current_line = (self.current_line + 1) % len(self.scene.dialogue)

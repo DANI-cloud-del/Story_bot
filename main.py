@@ -53,4 +53,8 @@ if __name__ == "__main__":
         
     except Exception as e:
         print(f"Error in main execution: {e}")
+        # Clean up any running audio processes
+        if 'window' in locals() and hasattr(window, 'current_speech_proc'):
+            if window.current_speech_proc and window.current_speech_proc.poll() is None:
+                window.current_speech_proc.terminate()
         input("Press Enter to exit...")
