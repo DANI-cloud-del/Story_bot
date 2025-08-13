@@ -1,4 +1,3 @@
-# story_window.py
 import arcade
 import arcade.future.background as background
 from settings import *
@@ -7,50 +6,60 @@ from scene import Scene
 
 class StoryWindow(arcade.Window):
     def __init__(self, scene: Scene):
-        super().__init__(WINDOW_WIDTH, WINDOW_HEIGHT, "Story Engine with Parallax", resizable=True)
-
+        super().__init__(WINDOW_WIDTH, WINDOW_HEIGHT, "Dynamic Story Engine", resizable=True)
         self.scene = scene
-        self.background_color = (162, 84, 162, 255)
+        self.background_color = arcade.color.DARK_SLATE_GRAY  # Fallback color
         self.camera = arcade.Camera2D()
-
-        # Parallax backgrounds
+        
+        # Background setup with error handling
         self.backgrounds = background.ParallaxGroup()
         bg_layer_size_px = (WINDOW_WIDTH, SCALED_BG_LAYER_HEIGHT_PX)
         depths = [10.0, 5.0, 3.0, 1.0]
-
-        for path, depth in zip(self.scene.background_layers, depths):
-            self.backgrounds.add_from_file(path, size=bg_layer_size_px, depth=depth, scale=PIXEL_SCALE)
-
-        # Characters
+        
+        # Try to load each background layer
+        for i, path in enumerate(scene.background_layers):
+            try:
+                self.backgrounds.add_from_file(
+                    path, 
+                    size=bg_layer_size_px, 
+                    depth=depths[i] if i < len(depths) else 1.0, 
+                    scale=PIXEL_SCALE
+                )
+            except Exception as e:
+                print(f"Failed to load background {path}: {e}")
+                # Use solid color if no backgrounds loaded
+                if not self.backgrounds:
+                    self.background_color = arcade.color.DARK_GREEN
+        # Character setup
         self.character_sprites = arcade.SpriteList()
-
         self.hero = CharacterSprite(
-            idle_path=self.scene.sprites["hero"],
-            walk_pattern=":resources:images/animated_characters/female_adventurer/femaleAdventurer_walk{}.png",
-            scale=0.5
+            scene.sprites["hero"],
+            ":resources:images/animated_characters/female_adventurer/femaleAdventurer_walk{}.png",
+            0.5
         )
         self.hero.position = 200, 150
         self.character_sprites.append(self.hero)
 
         self.villain = CharacterSprite(
-            idle_path=self.scene.sprites["villain"],
-            walk_pattern=":resources:images/animated_characters/zombie/zombie_walk{}.png",
-            scale=0.5
+            scene.sprites["villain"],
+            ":resources:images/animated_characters/zombie/zombie_walk{}.png",
+            0.5
         )
         self.villain.position = 600, 150
         self.character_sprites.append(self.villain)
 
-        # Movement flags
-        self.hero_movement = {"up": False, "down": False, "left": False, "right": False}
-        self.villain_movement = {"up": False, "down": False, "left": False, "right": False}
-        self.movement_speed = 200
-
-        # Dialogue state
+        # Movement and animation state
+        self.hero_movement = {k: False for k in ["up","down","left","right"]}
+        self.villain_movement = {k: False for k in ["up","down","left","right"]}
+        self.movement_speed = PLAYER_SPEED
+        
+        # Dialogue system
         self.current_line = 0
         self.dialogue_alpha = 0.0
         self.fade_state = "fadein"
         self.dialogue_timer = 0
-        self.animation_controller = None
+        
+        # Animation system
         self.animation_instructions = []
         self.current_instruction_index = 0
         self.instruction_timer = 0
