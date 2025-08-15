@@ -1,0 +1,5 @@
+arcade==3.3.2
+groq==0.31.0
+pyglet==2.1.6
+pymunk==6.9.0
+pytiled_parser==2.2.9
